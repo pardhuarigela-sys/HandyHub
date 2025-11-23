@@ -25,6 +25,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import com.example.handyhub.ui.theme.HandyHubTheme
 import com.google.firebase.auth.FirebaseAuth
 
@@ -45,7 +48,7 @@ class DashboardActivity : ComponentActivity() {
                 DashboardScreen(
                     onLogout = {
                         FirebaseAuth.getInstance().signOut()
-                        //startActivity(Intent(this, LoginActivity::class.java))
+                        startActivity(Intent(this, LoginActivity::class.java))
                         finish()
                     }
                 )
@@ -54,36 +57,12 @@ class DashboardActivity : ComponentActivity() {
     }
 }
 
-// Sample data for now (no Firestore)
+// SAMPLE DATA
 private val sampleProviders = listOf(
-    ServiceProvider(
-        id = "1",
-        name = "Clean & Shine Services",
-        serviceType = "Cleaner",
-        rating = 4.5,
-        city = "Middlesbrough"
-    ),
-    ServiceProvider(
-        id = "2",
-        name = "SparkPro Electricians",
-        serviceType = "Electrician",
-        rating = 4.8,
-        city = "Newcastle"
-    ),
-    ServiceProvider(
-        id = "3",
-        name = "QuickFix Plumbing",
-        serviceType = "Plumber",
-        rating = 4.3,
-        city = "Leeds"
-    ),
-    ServiceProvider(
-        id = "4",
-        name = "HomeCare Cleaning",
-        serviceType = "Cleaner",
-        rating = 4.1,
-        city = "York"
-    )
+    ServiceProvider("1", "Clean & Shine Services", "Cleaner", 4.5, "Middlesbrough"),
+    ServiceProvider("2", "SparkPro Electricians", "Electrician", 4.8, "Newcastle"),
+    ServiceProvider("3", "QuickFix Plumbing", "Plumber", 4.3, "Leeds"),
+    ServiceProvider("4", "HomeCare Cleaning", "Cleaner", 4.1, "York")
 )
 
 @Composable
@@ -93,16 +72,16 @@ fun DashboardScreen(
     var selectedCategory by remember { mutableStateOf("All") }
     var searchQuery by remember { mutableStateOf("") }
 
-    // Filter providers by category + search
+    // FILTERED LIST
     val filteredProviders = remember(selectedCategory, searchQuery) {
         sampleProviders.filter { provider ->
             val matchesCategory =
                 selectedCategory == "All" || provider.serviceType == selectedCategory
 
-            val query = searchQuery.trim().lowercase()
-            val matchesSearch = query.isEmpty() ||
-                    provider.name.lowercase().contains(query) ||
-                    provider.city.lowercase().contains(query)
+            val q = searchQuery.trim().lowercase()
+            val matchesSearch = q.isEmpty() ||
+                    provider.name.lowercase().contains(q) ||
+                    provider.city.lowercase().contains(q)
 
             matchesCategory && matchesSearch
         }
@@ -112,10 +91,10 @@ fun DashboardScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF5F5F5))
-            .padding(top = 45.dp)   // ⭐ FIX: Push down from status bar / punch hole
+            .statusBarsPadding()   //
     ) {
 
-        // -------------------- HEADER AREA --------------------
+        // ---------------- HEADER ----------------
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -152,102 +131,68 @@ fun DashboardScreen(
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
-                // -------------------- SEARCH BAR --------------------
+                // ---------------- SEARCH ----------------
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     placeholder = { Text("Search by name or city") },
                     singleLine = true,
                     shape = RoundedCornerShape(20.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth()
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // -------------------- CATEGORY FILTERS --------------------
+                // ---------------- FILTERS ----------------
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    FilterChip(
-                        label = "All",
-                        selected = selectedCategory == "All",
-                        onClick = { selectedCategory = "All" }
-                    )
-                    FilterChip(
-                        label = "Cleaner",
-                        selected = selectedCategory == "Cleaner",
-                        onClick = { selectedCategory = "Cleaner" }
-                    )
-                    FilterChip(
-                        label = "Electrician",
-                        selected = selectedCategory == "Electrician",
-                        onClick = { selectedCategory = "Electrician" }
-                    )
-                    FilterChip(
-                        label = "Plumber",
-                        selected = selectedCategory == "Plumber",
-                        onClick = { selectedCategory = "Plumber" }
-                    )
+                    FilterChip("All", selectedCategory == "All") { selectedCategory = "All" }
+                    FilterChip("Cleaner", selectedCategory == "Cleaner") { selectedCategory = "Cleaner" }
+                    FilterChip("Electrician", selectedCategory == "Electrician") { selectedCategory = "Electrician" }
+                    FilterChip("Plumber", selectedCategory == "Plumber") { selectedCategory = "Plumber" }
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-
-        // -------------------- PROVIDER LIST --------------------
+        // ---------------- PROVIDER LIST ----------------
         if (filteredProviders.isEmpty()) {
-
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 Text("No providers match your search.")
             }
-
         } else {
-
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp)
             ) {
                 items(filteredProviders) { provider ->
-                    ProviderCard(provider = provider)
+                    ProviderCard(provider)
                 }
             }
-
         }
     }
 }
 
-
 @Composable
-fun FilterChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    val background = if (selected) Color(0xFFCDECE1) else Color(0xFFE0F2F1)
+fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    val bg = if (selected) Color(0xFFCDECE1) else Color(0xFFE0F2F1)
     val textColor = if (selected) Color(0xFF1B4332) else Color(0xFF455A64)
 
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(background)
+            .background(bg)
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        Text(
-            text = label,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            color = textColor
-        )
+        Text(text = label, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = textColor)
     }
 }
 
@@ -257,13 +202,11 @@ fun ProviderCard(provider: ServiceProvider) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
+        elevation = CardDefaults.cardElevation(4.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
+
             Text(
                 text = provider.name,
                 fontSize = 18.sp,
@@ -271,18 +214,16 @@ fun ProviderCard(provider: ServiceProvider) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+
             Text(
                 text = provider.serviceType,
                 fontSize = 14.sp,
                 color = Color(0xFF1565C0),
                 modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
             )
-            Text(
-                text = "City: ${provider.city}",
-                fontSize = 13.sp
-            )
 
-            // Rating with a star character
+            Text(text = "City: ${provider.city}", fontSize = 13.sp)
+
             Text(
                 text = "Rating: ★ ${provider.rating}",
                 fontSize = 13.sp,

@@ -35,11 +35,7 @@ class LoginActivity : ComponentActivity() {
 
         auth = FirebaseAuth.getInstance()
 
-        // Auto-login if already authenticated
-        auth.currentUser?.let {
-            startActivity(Intent(this, DashboardActivity::class.java))
-            finish()
-        }
+
 
         setContent {
             HandyHubTheme {
@@ -65,6 +61,7 @@ class LoginActivity : ComponentActivity() {
         auth.signInWithEmailAndPassword(email, password)
             .addOnSuccessListener {
                 Toast.makeText(this, "Login successful", Toast.LENGTH_SHORT).show()
+
                 startActivity(Intent(this, DashboardActivity::class.java))
                 finish()
             }
