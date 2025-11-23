@@ -14,14 +14,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.handyhub.ui.theme.HandyHubTheme
@@ -44,7 +45,7 @@ class DashboardActivity : ComponentActivity() {
                 DashboardScreen(
                     onLogout = {
                         FirebaseAuth.getInstance().signOut()
-                       startActivity(Intent(this, LoginActivity::class.java))
+                        //startActivity(Intent(this, LoginActivity::class.java))
                         finish()
                     }
                 )
@@ -75,6 +76,13 @@ private val sampleProviders = listOf(
         serviceType = "Plumber",
         rating = 4.3,
         city = "Leeds"
+    ),
+    ServiceProvider(
+        id = "4",
+        name = "HomeCare Cleaning",
+        serviceType = "Cleaner",
+        rating = 4.1,
+        city = "York"
     )
 )
 
@@ -82,87 +90,163 @@ private val sampleProviders = listOf(
 fun DashboardScreen(
     onLogout: () -> Unit
 ) {
-    // Use sample list for now
-    val providers = remember { sampleProviders }
+    var selectedCategory by remember { mutableStateOf("All") }
+    var searchQuery by remember { mutableStateOf("") }
+
+    // Filter providers by category + search
+    val filteredProviders = remember(selectedCategory, searchQuery) {
+        sampleProviders.filter { provider ->
+            val matchesCategory =
+                selectedCategory == "All" || provider.serviceType == selectedCategory
+
+            val query = searchQuery.trim().lowercase()
+            val matchesSearch = query.isEmpty() ||
+                    provider.name.lowercase().contains(query) ||
+                    provider.city.lowercase().contains(query)
+
+            matchesCategory && matchesSearch
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .background(Color(0xFFF5F5F5))
+            .padding(top = 45.dp)   // ⭐ FIX: Push down from status bar / punch hole
     ) {
 
-        // Top bar (title + logout)
-        Row(
+        // -------------------- HEADER AREA --------------------
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .background(Color.White)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            Text(
-                text = "HandyHub",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Logout",
-                fontSize = 14.sp,
-                color = Color(0xFFB00020),
-                modifier = Modifier.clickable { onLogout() }
-            )
+            Column {
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "HandyHub",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        text = "Logout",
+                        fontSize = 14.sp,
+                        color = Color(0xFFB00020),
+                        modifier = Modifier.clickable { onLogout() }
+                    )
+                }
+
+                Text(
+                    text = "Find trusted home service providers.",
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+
+                // -------------------- SEARCH BAR --------------------
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search by name or city") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // -------------------- CATEGORY FILTERS --------------------
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    FilterChip(
+                        label = "All",
+                        selected = selectedCategory == "All",
+                        onClick = { selectedCategory = "All" }
+                    )
+                    FilterChip(
+                        label = "Cleaner",
+                        selected = selectedCategory == "Cleaner",
+                        onClick = { selectedCategory = "Cleaner" }
+                    )
+                    FilterChip(
+                        label = "Electrician",
+                        selected = selectedCategory == "Electrician",
+                        onClick = { selectedCategory = "Electrician" }
+                    )
+                    FilterChip(
+                        label = "Plumber",
+                        selected = selectedCategory == "Plumber",
+                        onClick = { selectedCategory = "Plumber" }
+                    )
+                }
+            }
         }
 
-        Text(
-            text = "Find trusted home service providers.",
-            fontSize = 14.sp,
-            color = Color.Gray,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // Category chips (static for now)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            CategoryChip("Cleaner")
-            CategoryChip("Electrician")
-            CategoryChip("Plumber")
-        }
 
-        // Simple list using sample data
-        if (providers.isEmpty()) {
+        // -------------------- PROVIDER LIST --------------------
+        if (filteredProviders.isEmpty()) {
+
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text("No providers available.")
+                Text("No providers match your search.")
             }
+
         } else {
+
             LazyColumn(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
             ) {
-                items(providers) { provider ->
+                items(filteredProviders) { provider ->
                     ProviderCard(provider = provider)
                 }
             }
+
         }
     }
 }
 
+
 @Composable
-fun CategoryChip(text: String) {
+fun FilterChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val background = if (selected) Color(0xFFCDECE1) else Color(0xFFE0F2F1)
+    val textColor = if (selected) Color(0xFF1B4332) else Color(0xFF455A64)
+
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xFFE0F2F1))
+            .background(background)
+            .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         Text(
-            text = text,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium
+            text = label,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = textColor
         )
     }
 }
@@ -176,27 +260,34 @@ fun ProviderCard(provider: ServiceProvider) {
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        )
+        ),
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(
                 text = provider.name,
                 fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = provider.serviceType,
                 fontSize = 14.sp,
-                color = Color(0xFF1565C0)
+                color = Color(0xFF1565C0),
+                modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
             )
             Text(
                 text = "City: ${provider.city}",
                 fontSize = 13.sp
             )
+
+            // Rating with a star character
             Text(
-                text = "Rating: ${provider.rating}",
+                text = "Rating: ★ ${provider.rating}",
                 fontSize = 13.sp,
-                color = Color(0xFFFF8F00)
+                color = Color(0xFFFF8F00),
+                modifier = Modifier.padding(top = 4.dp)
             )
         }
     }
