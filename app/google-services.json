@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "888541045036",
+    "project_id": "handyhub-ff874",
+    "storage_bucket": "handyhub-ff874.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:888541045036:android:3f981647f1f7b5ae854c89",
+        "android_client_info": {
+          "package_name": "com.example.handyhub"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC6JwUdNRk1aAW7Ord-Ve_3E5KteGh2xVQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
