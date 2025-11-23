@@ -44,7 +44,7 @@ class DashboardActivity : ComponentActivity() {
                 DashboardScreen(
                     onLogout = {
                         FirebaseAuth.getInstance().signOut()
-                        startActivity(Intent(this, LoginActivity::class.java))
+                       startActivity(Intent(this, LoginActivity::class.java))
                         finish()
                     }
                 )

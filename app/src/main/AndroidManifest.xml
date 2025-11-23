@@ -29,6 +29,8 @@
             android:theme="@style/Theme.HandyHub"/>
         <activity
             android:name=".SignupActivity"/>
+        <activity
+            android:name=".DashboardActivity"/>
     </application>
 
 </manifest>
