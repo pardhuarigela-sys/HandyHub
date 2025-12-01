@@ -31,6 +31,8 @@
             android:name=".SignupActivity"/>
         <activity
             android:name=".DashboardActivity"/>
+        <activity
+            android:name=".ProviderDetailsActivity"/>
 
     </application>
 
