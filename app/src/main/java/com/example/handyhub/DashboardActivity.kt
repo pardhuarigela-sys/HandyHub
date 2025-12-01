@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -25,11 +24,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.windowInsetsPadding
 import com.example.handyhub.ui.theme.HandyHubTheme
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 data class ServiceProvider(
     val id: String = "",
@@ -39,7 +37,49 @@ data class ServiceProvider(
     val city: String = ""
 )
 
+// ✅ Sample data you can also store in Firestore later
+private val sampleProviders = listOf(
+    ServiceProvider(
+        id = "1",
+        name = "Clean & Shine Services",
+        serviceType = "Cleaner",
+        rating = 4.5,
+        city = "Middlesbrough"
+    ),
+    ServiceProvider(
+        id = "2",
+        name = "SparkPro Electricians",
+        serviceType = "Electrician",
+        rating = 4.8,
+        city = "Newcastle"
+    ),
+    ServiceProvider(
+        id = "3",
+        name = "QuickFix Plumbing",
+        serviceType = "Plumber",
+        rating = 4.3,
+        city = "Leeds"
+    ),
+    ServiceProvider(
+        id = "4",
+        name = "HomeCare Cleaning",
+        serviceType = "Cleaner",
+        rating = 4.1,
+        city = "York"
+    ),
+    ServiceProvider(
+        id = "5",
+        name = "PowerGrid Electric Solutions",
+        serviceType = "Electrician",
+        rating = 4.7,
+        city = "Manchester"
+    )
+)
+
 class DashboardActivity : ComponentActivity() {
+
+    private val db: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -50,31 +90,53 @@ class DashboardActivity : ComponentActivity() {
                         FirebaseAuth.getInstance().signOut()
                         startActivity(Intent(this, LoginActivity::class.java))
                         finish()
-                    }
+                    },
+                    db = db
                 )
             }
         }
     }
 }
 
-// SAMPLE DATA
-private val sampleProviders = listOf(
-    ServiceProvider("1", "Clean & Shine Services", "Cleaner", 4.5, "Middlesbrough"),
-    ServiceProvider("2", "SparkPro Electricians", "Electrician", 4.8, "Newcastle"),
-    ServiceProvider("3", "QuickFix Plumbing", "Plumber", 4.3, "Leeds"),
-    ServiceProvider("4", "HomeCare Cleaning", "Cleaner", 4.1, "York")
-)
-
 @Composable
 fun DashboardScreen(
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    db: FirebaseFirestore
 ) {
     var selectedCategory by remember { mutableStateOf("All") }
     var searchQuery by remember { mutableStateOf("") }
 
-    // FILTERED LIST
-    val filteredProviders = remember(selectedCategory, searchQuery) {
-        sampleProviders.filter { provider ->
+    var providers by remember { mutableStateOf<List<ServiceProvider>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    // Load providers from Firestore once when the screen opens
+    LaunchedEffect(Unit) {
+        db.collection("providers")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                providers = if (snapshot.isEmpty) {
+                    // 🔹 If Firestore has no data yet, use sample data
+                    sampleProviders
+                } else {
+                    snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(ServiceProvider::class.java)?.copy(id = doc.id)
+                    }
+                }
+                isLoading = false
+                errorMessage = null
+            }
+            .addOnFailureListener { e ->
+                isLoading = false
+                errorMessage = e.message ?: "Failed to load providers"
+                // Also fall back to sample data on error
+                providers = sampleProviders
+            }
+    }
+
+    // FILTERED LIST (now uses providers from Firestore or sample list)
+    val filteredProviders = remember(providers, selectedCategory, searchQuery) {
+        providers.filter { provider ->
             val matchesCategory =
                 selectedCategory == "All" || provider.serviceType == selectedCategory
 
@@ -91,7 +153,7 @@ fun DashboardScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF5F5F5))
-            .statusBarsPadding()   //
+            .statusBarsPadding()
     ) {
 
         // ---------------- HEADER ----------------
@@ -158,22 +220,44 @@ fun DashboardScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // ---------------- PROVIDER LIST ----------------
-        if (filteredProviders.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("No providers match your search.")
+        // ---------------- PROVIDER LIST / STATES ----------------
+        when {
+            isLoading -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Loading providers...")
+                }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp)
-            ) {
-                items(filteredProviders) { provider ->
-                    ProviderCard(provider)
+
+            errorMessage != null && filteredProviders.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Error: $errorMessage")
+                }
+            }
+
+            filteredProviders.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No providers match your search.")
+                }
+            }
+
+            else -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    items(filteredProviders) { provider ->
+                        ProviderCard(provider)
+                    }
                 }
             }
         }
