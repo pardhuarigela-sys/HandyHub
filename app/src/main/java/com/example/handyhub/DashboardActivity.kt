@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import com.example.handyhub.ui.theme.HandyHubTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
 
 // ---------------------- DATA MODELS ----------------------
 data class ServiceProvider(
@@ -48,15 +47,6 @@ data class Booking(
     val providerCity: String = "",
     val userId: String = "",
     val timestamp: Long = 0L
-)
-
-// ---------------------- SAMPLE PROVIDERS ----------------------
-private val sampleProviders = listOf(
-    ServiceProvider("1", "Clean & Shine Services", "Cleaner", 4.5, "Middlesbrough", "07123456789"),
-    ServiceProvider("2", "SparkPro Electricians", "Electrician", 4.8, "Newcastle", "07111111111"),
-    ServiceProvider("3", "QuickFix Plumbing", "Plumber", 4.3, "Leeds", "07222222222"),
-    ServiceProvider("4", "HomeCare Cleaning", "Cleaner", 4.1, "York", "07333333333"),
-    ServiceProvider("5", "PowerGrid Electric Solutions", "Electrician", 4.7, "Manchester", "07444444444")
 )
 
 // ---------------------- ACTIVITY ----------------------
@@ -174,28 +164,23 @@ fun DashboardScreenContent(
 
     var providers by remember { mutableStateOf<List<ServiceProvider>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // load providers + seed sample into Firestore if empty
+    // load providers only from Firestore
     LaunchedEffect(Unit) {
         db.collection("providers")
             .get()
             .addOnSuccessListener { snapshot ->
-                if (snapshot.isEmpty) {
-                    // Seed sample providers into Firestore
-                    sampleProviders.forEach { provider ->
-                        db.collection("providers").add(provider)
-                    }
-                    providers = sampleProviders
-                } else {
-                    providers = snapshot.documents.mapNotNull { doc ->
-                        doc.toObject(ServiceProvider::class.java)?.copy(id = doc.id)
-                    }
+                providers = snapshot.documents.mapNotNull { doc ->
+                    doc.toObject(ServiceProvider::class.java)?.copy(id = doc.id)
                 }
                 isLoading = false
+                errorMessage = null
             }
-            .addOnFailureListener {
-                providers = sampleProviders
+            .addOnFailureListener { e ->
+                providers = emptyList()
                 isLoading = false
+                errorMessage = e.message ?: "Failed to load providers."
             }
     }
 
@@ -273,26 +258,38 @@ fun DashboardScreenContent(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        if (isLoading) {
-            LoadingView()
-        } else if (filteredProviders.isEmpty()) {
-            EmptyView()
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp)
-            ) {
-                items(filteredProviders) { provider ->
-                    ProviderCard(provider) {
-                        val intent = Intent(context, ProviderDetailsActivity::class.java).apply {
-                            putExtra("name", provider.name)
-                            putExtra("serviceType", provider.serviceType)
-                            putExtra("city", provider.city)
-                            putExtra("rating", provider.rating)
-                            putExtra("phoneNumber", provider.phoneNumber)
+        when {
+            isLoading -> {
+                LoadingView()
+            }
+            errorMessage != null && filteredProviders.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(errorMessage ?: "Something went wrong.")
+                }
+            }
+            filteredProviders.isEmpty() -> {
+                EmptyView()
+            }
+            else -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    items(filteredProviders) { provider ->
+                        ProviderCard(provider) {
+                            val intent = Intent(context, ProviderDetailsActivity::class.java).apply {
+                                putExtra("name", provider.name)
+                                putExtra("serviceType", provider.serviceType)
+                                putExtra("city", provider.city)
+                                putExtra("rating", provider.rating)
+                                putExtra("phoneNumber", provider.phoneNumber)
+                            }
+                            context.startActivity(intent)
                         }
-                        context.startActivity(intent)
                     }
                 }
             }
@@ -310,24 +307,28 @@ fun BookingHistoryScreen(
 
     var bookings by remember { mutableStateOf<List<Booking>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(userId) {
         if (userId == null) {
             bookings = emptyList()
+            errorMessage = "Please log in to see your bookings."
             isLoading = false
         } else {
             db.collection("bookings")
                 .whereEqualTo("userId", userId)
-                .orderBy("timestamp", Query.Direction.DESCENDING)
                 .get()
                 .addOnSuccessListener { snapshot ->
-                    bookings = snapshot.documents.mapNotNull { doc ->
+                    val list = snapshot.documents.mapNotNull { doc ->
                         doc.toObject(Booking::class.java)?.copy(id = doc.id)
                     }
+                    bookings = list.sortedByDescending { it.timestamp }
+                    errorMessage = null
                     isLoading = false
                 }
-                .addOnFailureListener {
+                .addOnFailureListener { e ->
                     bookings = emptyList()
+                    errorMessage = e.message ?: "Failed to load bookings."
                     isLoading = false
                 }
         }
@@ -346,19 +347,31 @@ fun BookingHistoryScreen(
             modifier = Modifier.padding(bottom = 12.dp)
         )
 
-        if (isLoading) {
-            LoadingView()
-        } else if (bookings.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("No bookings yet.")
+        when {
+            isLoading -> {
+                LoadingView()
             }
-        } else {
-            LazyColumn {
-                items(bookings) { booking ->
-                    BookingCard(booking)
+            errorMessage != null && bookings.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(errorMessage ?: "Something went wrong.")
+                }
+            }
+            bookings.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No bookings yet.")
+                }
+            }
+            else -> {
+                LazyColumn {
+                    items(bookings) { booking ->
+                        BookingCard(booking)
+                    }
                 }
             }
         }
